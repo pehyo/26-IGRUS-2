@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>My Checklist</title>
+
+
+<style>
+    .list-drag{
+
+cursor:grab;
+
+}
+
+
+.list-drag:active{
+
+cursor:grabbing;
+
+}
+
+
+.list-drag.dragging{
+
+opacity:0.5;
+
+}
+
+    .drag{
+
+cursor:grab;
+
+}
+
+
+.drag:active{
+
+cursor:grabbing;
+
+}
+
+
+.item.dragging{
+
+opacity:0.5;
+
+}
+
+*{
+    box-sizing:border-box;
+    font-family:Arial, sans-serif;
+}
+
+
+body{
+
+    margin:0;
+    background:#f7f7f8;
+
+}
+
+
+
+.container{
+
+    max-width:600px;
+    margin:40px auto;
+    padding:20px;
+
+}
+
+
+
+h1{
+
+    font-size:32px;
+
+}
+
+
+
+
+.card{
+
+    background:white;
+
+    padding:20px;
+
+    margin:15px 0;
+
+    border-radius:18px;
+
+
+    box-shadow:
+    0 5px 15px rgba(0,0,0,0.08);
+
+}
+
+
+
+
+.card:hover{
+
+    transform:translateY(-3px);
+
+}
+
+
+
+
+.progress{
+
+    height:12px;
+
+    background:#eee;
+
+    border-radius:10px;
+
+    overflow:hidden;
+
+}
+
+
+
+
+.bar{
+
+    height:100%;
+
+    background:#6366f1;
+
+}
+
+
+
+
+input{
+
+    padding:12px;
+
+    border-radius:10px;
+
+    border:1px solid #ddd;
+
+    margin:5px;
+
+}
+
+
+
+
+button{
+
+    padding:10px 14px;
+
+    border:none;
+
+    border-radius:10px;
+
+    background:#6366f1;
+
+    color:white;
+
+    cursor:pointer;
+
+}
+
+
+
+
+.edit{
+
+    background:#10b981;
+
+}
+
+
+
+.delete{
+
+    background:#ef4444;
+
+}
+
+
+
+
+.item{
+
+    background:white;
+
+    padding:15px;
+
+    margin:10px 0;
+
+    border-radius:12px;
+
+    display:flex;
+
+    justify-content:space-between;
+
+}
+
+
+
+
+.done{
+
+    text-decoration:line-through;
+
+    color:#999;
+
+}
+
+
+
+
+.small{
+
+    font-size:13px;
+
+    color:#777;
+
+}
+
+
+
+.back{
+
+    background:#ddd;
+
+    color:#333;
+
+}
+
+
+</style>
+
+
+</head>
+
+
+
+<body>
+
+
+<div class="container" id="app"></div>
+
+
+
+<script>
+
+
+let data =
+JSON.parse(localStorage.getItem("checklist"));
+
+
+
+// 저장 데이터 없으면 기본 생성
+
+if(!Array.isArray(data)){
+
+
+data = [
+
+
+{
+
+id:"wishlist",
+
+title:"⭐ 위시리스트",
+
+items:[]
+
+},
+
+
+{
+
+id:"todo",
+
+title:"✅ 투두리스트",
+
+items:[]
+
+},
+
+
+{
+
+id:"shopping",
+
+title:"🛒 쇼핑리스트",
+
+items:[]
+
+}
+
+
+];
+
+
+save();
+
+
+}
+
+
+
+
+let current=null;
+
+
+
+
+
+function save(){
+
+
+localStorage.setItem(
+
+"checklist",
+
+JSON.stringify(data)
+
+);
+
+
+}
+
+
+
+
+
+function percent(items){
+
+
+if(items.length===0)
+
+return 0;
+
+
+
+return Math.round(
+
+items.filter(x=>x.checked).length
+
+/items.length
+
+*100
+
+);
+
+
+}
+
+
+
+
+
+
+
+function home(){
+
+
+
+let app=document.getElementById("app");
+
+
+
+app.innerHTML=`
+
+<h1>
+
+My Checklist
+
+</h1>
+
+
+
+<p>
+
+나만의 체크리스트 관리
+
+</p>
+
+
+
+${data.map((list,index)=>`
+
+
+
+<div class="card list-drag"
+
+draggable="true"
+
+ondragstart="listDragStart(event,${index})"
+
+ondragover="listDragOver(event)"
+
+ondrop="listDrop(event,${index})"
+
+onclick="openList(${index})">
+
+
+
+<h2>
+
+${list.title}
+
+</h2>
+
+
+
+
+<p>
+
+${list.items.filter(x=>x.checked).length}
+
+/
+
+${list.items.length}
+
+완료
+
+</p>
+
+
+
+
+<div class="progress">
+
+
+<div class="bar"
+
+style="width:${percent(list.items)}%">
+
+
+</div>
+
+
+</div>
+
+
+
+<p>
+
+${percent(list.items)}%
+
+</p>
+
+
+
+<button class="edit"
+
+onclick="event.stopPropagation(); renameList(${index})">
+
+이름 수정
+
+</button>
+
+
+
+<button class="delete"
+
+onclick="event.stopPropagation(); deleteList(${index})">
+
+목록 삭제
+
+</button>
+
+
+
+</div>
+
+
+
+`).join("")}
+
+
+
+
+<hr>
+
+
+
+<h3>
+
+➕ 새 목록 만들기
+
+</h3>
+
+
+
+<input id="newTitle"
+
+placeholder="예: 공부 계획">
+
+
+
+<button onclick="createList()">
+
+생성
+
+</button>
+
+
+
+`;
+
+
+
+}
+
+
+
+
+
+
+
+
+
+function createList(){
+
+
+let title=
+
+document.getElementById("newTitle").value;
+
+
+
+if(title.trim()==="")
+
+return;
+
+
+
+data.push({
+
+id:Date.now(),
+
+title:title,
+
+items:[]
+
+});
+
+
+
+save();
+
+
+home();
+
+
+}
+
+
+
+
+
+
+
+
+function renameList(index){
+
+
+
+let newName = prompt(
+
+"새로운 목록 이름을 입력하세요",
+
+data[index].title
+
+);
+
+
+
+if(newName===null)
+
+return;
+
+
+
+
+newName=newName.trim();
+
+
+
+if(newName.length===0){
+
+
+alert("이름을 입력해주세요");
+
+return;
+
+}
+
+
+
+data[index].title=newName;
+
+
+
+save();
+
+
+
+home();
+
+
+
+}
+
+
+
+
+
+
+
+
+function deleteList(index){
+
+
+
+let check=
+
+confirm(
+
+"이 목록을 삭제할까요?"
+
+);
+
+
+
+if(check){
+
+
+data.splice(index,1);
+
+
+save();
+
+
+home();
+
+
+}
+
+
+
+}
+
+
+
+
+
+
+
+
+function openList(index){
+
+
+
+current=index;
+
+
+let list=data[index];
+
+
+
+document.getElementById("app").innerHTML=`
+
+<button class="back"
+
+onclick="home()">
+
+← 뒤로
+
+</button>
+
+
+
+<h1>
+
+${list.title}
+
+</h1>
+
+
+
+
+<input id="text"
+
+placeholder="할 일 입력">
+
+
+
+<input type="date"
+
+id="date">
+
+
+
+<button onclick="addItem()">
+
+추가
+
+</button>
+
+
+
+
+<div>
+
+
+${renderItems()}
+
+
+</div>
+
+
+
+`;
+
+
+
+}
+
+
+
+
+
+
+
+
+
+function renderItems(){
+
+
+return data[current].items.map((item,index)=>`
+
+
+
+<div class="item drag"
+
+draggable="true"
+
+ondragstart="dragStart(event,${index})"
+
+ondragover="dragOver(event)"
+
+ondrop="dropItem(event,${index})"
+
+
+
+>
+
+
+<div
+
+onclick="toggle(${index})"
+
+class="${item.checked?'done':''}">
+
+
+
+${item.checked?"☑":"☐"}
+
+${item.text}
+
+
+
+<div class="small">
+
+📅 ${item.date || "날짜 없음"}
+
+</div>
+
+
+
+</div>
+
+
+
+<button class="delete"
+
+onclick="removeItem(${index})">
+
+삭제
+
+</button>
+
+
+
+</div>
+
+
+
+`).join("");
+
+
+
+}
+
+
+
+
+
+
+
+
+function addItem(){
+
+
+
+let text=
+
+document.getElementById("text").value;
+
+
+
+let date=
+
+document.getElementById("date").value;
+
+
+
+if(text.trim()==="")
+
+return;
+
+
+
+data[current].items.push({
+
+
+text:text,
+
+
+checked:false,
+
+
+date:date
+
+
+});
+
+
+
+save();
+
+
+
+openList(current);
+
+
+
+}
+
+
+
+
+
+
+
+
+function toggle(index){
+
+
+
+data[current].items[index].checked=
+
+!data[current].items[index].checked;
+
+
+
+save();
+
+
+
+openList(current);
+
+
+
+}
+
+
+
+
+
+
+
+
+
+function removeItem(index){
+
+
+
+data[current].items.splice(index,1);
+
+
+
+save();
+
+
+
+openList(current);
+
+}
+
+let dragIndex=null;
+
+
+
+function dragStart(event,index){
+
+
+dragIndex=index;
+
+
+event.dataTransfer.effectAllowed="move";
+
+
+}
+
+
+
+
+
+function dragOver(event){
+
+
+event.preventDefault();
+
+
+}
+
+
+
+
+
+
+
+function dropItem(event,targetIndex){
+
+
+event.preventDefault();
+
+
+
+if(dragIndex===null)
+
+return;
+
+
+
+let item =
+data[current].items[dragIndex];
+
+
+
+data[current].items.splice(dragIndex,1);
+
+
+
+data[current].items.splice(
+targetIndex,
+0,
+item
+);
+
+
+
+dragIndex=null;
+
+
+
+save();
+
+
+
+openList(current);
+
+
+
+}
+
+
+
+
+
+
+home();
+
+
+
+</script>
+
+
+
+</body>
+
+</html>
